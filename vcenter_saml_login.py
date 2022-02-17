@@ -11,7 +11,6 @@ import socket
 import ssl
 import OpenSSL.crypto as crypto
 
-import ldap
 import lxml.etree as etree
 import requests
 import urllib3
